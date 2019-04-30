@@ -187,11 +187,46 @@ bool Fourier_Motzkin_Elimination_step(std::vector<double> &solution_infeasible, 
 		return false;
 	}
 	else {
-		//DO THINGS
+		//THIS DOESNT WORK PROPERLY FOR SOME REASON
 		//find min{a_l(^T)*x-b_l | l in L}
-		/*for (int l : L) {
+		double lower_bound;
+		bool lower_bound_initialized=false;
+		double upper_bound;
+		bool upper_bound_initialized=false;
+		for (int l : L) {
 			double sum = 0;
-		}*/
+			//compute vector product (a_l)^T*solution_feasible
+			for (int i = 0; i < new_LP.n - 1; i++) {
+				sum += new_LP.A[l][new_LP.n] * solution_feasible[original_column_count - i];
+			}
+			if (lower_bound_initialized == false) {
+				lower_bound = sum - new_LP.b[l];
+				lower_bound_initialized = true;
+			}
+			else {
+				if (sum - new_LP.b[l] > lower_bound) lower_bound = sum - new_LP.b[l];
+			}
+		}
+		for (int u : U) {
+			double sum = 0;
+			//compute vector product (a_l)^T*solution_feasible
+			for (int i = 0; i < new_LP.n - 1; i++) {
+				sum += new_LP.A[u][new_LP.n] * solution_feasible[original_column_count - i];
+			}
+			if (upper_bound_initialized == false) {
+				upper_bound = new_LP.b[u] - sum;
+				upper_bound_initialized = true;
+			}
+			else {
+				if (sum - new_LP.b[u] < lower_bound) lower_bound = new_LP.b[u]-sum;
+			}
+		}
+
+		if (lower_bound_initialized == true) solution_feasible[new_LP.n - 1] = lower_bound;
+		else if (upper_bound_initialized == true) solution_feasible[new_LP.n - 1] = upper_bound;
+		else solution_feasible[new_LP.n - 1] = 0;
+		for (int i = 0; i < original_column_count; i++) std::cout << ", " << solution_feasible[i];
+		std::cout << "\n";
 		return true;
 	}
 }
@@ -205,8 +240,14 @@ int main(int argc, char* argv[]) {
 	for (int i = 0; i < test.m; i++) {
 		history[i] = std::make_unique<double[]>(test.m);
 	}
-	test.print();
-	std::cout << "\nRESULT: " << Fourier_Motzkin_Elimination_step(solution_infeas, solution_feas, test, history, test.m, test.n);
+	if (Fourier_Motzkin_Elimination_step(solution_infeas, solution_feas, test, history, test.m, test.n) == 0) {
+		std::cout << "\nEmpty!\n";
+		for (int i = 0; i < test.m; i++) std::cout << solution_infeas[i] << ", ";
+	}
+	else {
+		std::cout << "\n";
+		for (int i = 0; i < test.n; i++) std::cout << solution_feas[i] << ", ";
+	}
 	return 0;
 }
 
