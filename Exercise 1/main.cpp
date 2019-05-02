@@ -4,9 +4,11 @@
 #include <string>
 #include <string>
 #include <fstream>
-//SOMETHING IS WRONG!!!
+
 //basic implementation of the Fourier-Motzkin Elimination
 //this is extremely inefficient, especially regarding memory!!!
+
+//We put everything into 1 file because the the program isnt so big
 
 typedef std::unique_ptr<std::unique_ptr<double[]>[]> Matrix;
 
@@ -37,7 +39,6 @@ public:
 	std::unique_ptr<double[]> c;
 	Matrix A;
 	std::unique_ptr<double[]> b;
-
 };
 
 LP::LP(int _m, int _n)  {
@@ -89,11 +90,20 @@ void LP::print() {
 	print_matrix(A, m, n);
 	std::cout << "\nb:\n";
 	for (int i = 0; i < m; i++) std::cout << b[i] << ", ";
+	std::cout << std::endl;
 }
 
 
 //the solution vectors have to have memory allocated when passing them to this function
-bool Fourier_Motzkin_Elimination_step(std::vector<double> &solution_infeasible, std::vector<double> &solution_feasible, LP& old_LP, Matrix &History, int original_row_count, int original_column_count) {
+//this function is to be called on the original LP with History=Im and computes a solution
+//or a certificate recursively
+bool Fourier_Motzkin_Elimination_step(std::vector<double> &solution_infeasible,
+									  std::vector<double> &solution_feasible,
+									  LP& old_LP,
+									  Matrix &History,
+									  int original_row_count,
+									  int original_column_count) {
+
 	//make vectors U, L and N like in the script to store the indices
 	//of positive, negative and zero-rows respectively
 	double temp;
@@ -138,7 +148,6 @@ bool Fourier_Motzkin_Elimination_step(std::vector<double> &solution_infeasible, 
 	}
 
 	//create new LP that will be equivalent (regarding feasibility) to the old one
-	//OLD-LP.N-1==0 MIGHT BE A PROBLEM
 	LP new_LP(positive_row_count*negative_row_count + zero_row_count, old_LP.n - 1); 
 
 	Matrix new_History = std::make_unique<std::unique_ptr<double[]>[]> (new_LP.m);
@@ -161,15 +170,15 @@ bool Fourier_Motzkin_Elimination_step(std::vector<double> &solution_infeasible, 
 		}
 	}
 	for (int n : N) {
-			for (int i = 0; i < new_LP.n; i++) {
-				new_LP.A[current_row][i] = old_LP.A[n][i + 1];
-			}
-			new_LP.b[current_row] = old_LP.b[n];
-			for (int i = 0; i < original_row_count; i++) {
-				new_History[current_row][i] = History[n][i];
-			}
-			current_row++;
+		for (int i = 0; i < new_LP.n; i++) {
+			new_LP.A[current_row][i] = old_LP.A[n][i + 1];
 		}
+		new_LP.b[current_row] = old_LP.b[n];
+		for (int i = 0; i < original_row_count; i++) {
+			new_History[current_row][i] = History[n][i];
+		}
+		current_row++;
+	}
 
 	if (new_LP.n == 0) {
 		//check if LP is infeasible. if so, retur the coefficients
@@ -197,8 +206,9 @@ bool Fourier_Motzkin_Elimination_step(std::vector<double> &solution_infeasible, 
 			double sum = 0;
 			//compute vector product (a_l)^T*solution_feasible
 			for (int i = 0; i < new_LP.n - 1; i++) {
-				sum += new_LP.A[l][new_LP.n] * solution_feasible[original_column_count - i];
+				sum += new_LP.A[l][new_LP.n-i-1] * solution_feasible[original_column_count - i-1];
 			}
+
 			if (lower_bound_initialized == false) {
 				lower_bound = sum - new_LP.b[l];
 				lower_bound_initialized = true;
@@ -211,35 +221,45 @@ bool Fourier_Motzkin_Elimination_step(std::vector<double> &solution_infeasible, 
 			double sum = 0;
 			//compute vector product (a_l)^T*solution_feasible
 			for (int i = 0; i < new_LP.n - 1; i++) {
-				sum += new_LP.A[u][new_LP.n] * solution_feasible[original_column_count - i];
+				sum += new_LP.A[u][new_LP.n - i-1] * solution_feasible[original_column_count - i-1];
 			}
+
 			if (upper_bound_initialized == false) {
 				upper_bound = new_LP.b[u] - sum;
 				upper_bound_initialized = true;
 			}
 			else {
-				if (sum - new_LP.b[u] < lower_bound) lower_bound = new_LP.b[u]-sum;
+				if (new_LP.b[u] - sum < lower_bound) lower_bound = new_LP.b[u] - sum;
 			}
 		}
 
 		if (lower_bound_initialized == true) solution_feasible[new_LP.n - 1] = lower_bound;
 		else if (upper_bound_initialized == true) solution_feasible[new_LP.n - 1] = upper_bound;
 		else solution_feasible[new_LP.n - 1] = 0;
-		for (int i = 0; i < original_column_count; i++) std::cout << ", " << solution_feasible[i];
-		std::cout << "\n";
 		return true;
 	}
 }
 
 int main(int argc, char* argv[]) {
+	//read in the LP
 	std::string filename(argv[1]);
 	LP test(filename);
+
+	test.print();
+
+	//set up solutions and history
 	std::vector<double> solution_feas (test.n);
 	std::vector<double> solution_infeas (test.m);
 	Matrix history = std::make_unique<std::unique_ptr<double[]>[]>(test.m);
 	for (int i = 0; i < test.m; i++) {
 		history[i] = std::make_unique<double[]>(test.m);
 	}
+
+	//initialize history
+	for (int i = 0; i < test.m; i++) {
+		history[i][i] = 1;
+	}
+
 	if (Fourier_Motzkin_Elimination_step(solution_infeas, solution_feas, test, history, test.m, test.n) == 0) {
 		std::cout << "\nEmpty!\n";
 		for (int i = 0; i < test.m; i++) std::cout << solution_infeas[i] << ", ";
